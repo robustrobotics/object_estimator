@@ -1,0 +1,13 @@
+<launch>
+
+  <arg name="fname" default="test"/>
+
+  <node pkg="topic_tools" type="throttle" name="tf_throttle"
+        args="messages /tf 50" />
+
+  <node pkg="rosbag" type="record" name="rosbag" args="record -o
+                                                       $(find object_estimator)/data/$(arg fname) 
+                                                       /tf_throttle
+                                                       /robot/limb/left/endpoint_state
+                                                       " output="screen"/>
+</launch>
