@@ -4,7 +4,8 @@ This repository is intended for a package required to estimate the internal stat
 This repository is tested with a Baxter robot in RRG, MIT. For deployment, users have to record a set of training data rosbags, train an HMM, and run a ros-service with data topics.
 
 ## Installation
-- Install HMM library following http://ghmm.sourceforge.net/installation.html
+- Install HMM library following http://ghmm.sourceforge.net/installation.html 
+  (See my old installation script: https://github.com/pidipidi/dpark_setup/blob/master/script/deprecated/ml_ghmm_install.sh)
 - Install dependencies
 ~~~~bash
 pip install -r requirements.txt
