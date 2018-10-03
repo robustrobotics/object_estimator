@@ -39,6 +39,16 @@ rosbag play data/s50_heavy/test_2018-04-26-22-22-53.bag
 rosservice call /object_state/left
 ~~~~
 
+## Option) Tunning
+- You can adjust parameters for the HMM so it will be able to fit better to the training data. There are several adjustable parameters in object_estimator/src/object_estimator/obj_state_classifier.py as followings
+~~~~
+self.nState       = 30        #number of hidden states in HMM
+self.nEmissionDim = 2         #dimension of inputs
+self.cov          = 1.0       #diagonal covariance matrix's covariance value
+self.scale        = [1.,1.]   #data scale multiplier
+~~~~
+self.cov (diagonal element value in covariance matrix for observed data) is the parameter you can modify first. This author recommends to adjust until the Baum Welch training process returns 0~400. 
+
 ## Creating a new estimator
 ### Data collection
 - Repeat an object lifting task and rosbag topics. For example, we used a following launch file to record necessary topics from a Baxter robot.
@@ -59,6 +69,12 @@ Same as the above
 ## ETC
 ### Arguments for the main launch file
 Under construction
+
+### Convergence error
+If you recieves following message after launching the estimator, it means the current HMM failed to fit to the observed data. You have tune the HMM's parameter as the above. 
+~~~~bash
+GHMM ghmm.py:148 - sreestimate.c:ghmm_cmodel_baum_welch(986): NO convergence: log P(8.225583e+03) < log P-old(1.085295e+04)! (n = 2)
+~~~~
 
 ### Option) Running procedure with the Baxter Experiment Stack
 - Running procedure for simulation
