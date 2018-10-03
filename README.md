@@ -47,7 +47,7 @@ self.nEmissionDim = 2         #dimension of inputs
 self.cov          = 1.0       #diagonal covariance matrix's covariance value
 self.scale        = [1.,1.]   #data scale multiplier
 ~~~~
-self.cov (diagonal element value in covariance matrix for observed data) is the parameter you can modify first. This author recommends to adjust until the Baum Welch training process returns 0~400. 
+self.cov (diagonal element value in covariance matrix for observed data) is the parameter you can modify first. This author recommends to adjust it until the Baum Welch training process returns 0~400. 
 
 ## Creating a new estimator
 ### Data collection
@@ -71,7 +71,7 @@ Same as the above
 Under construction
 
 ### Convergence error
-If you recieves following message after launching the estimator, it means the current HMM failed to fit to the observed data. You have tune the HMM's parameter as the above. 
+If you recieves following message after launching the estimator, it means the current HMM failed to fit to the observed data. You have to tune the HMM's parameter as the above. 
 ~~~~bash
 GHMM ghmm.py:148 - sreestimate.c:ghmm_cmodel_baum_welch(986): NO convergence: log P(8.225583e+03) < log P-old(1.085295e+04)! (n = 2)
 ~~~~
