@@ -61,15 +61,19 @@ class obj_state_classifier(learning_base):
     This class provides an object for binary state classification
     using hidden Markov models.
     """
-    def __init__(self, input_labels, output_labels, state_topic, srv_topic, debug=False):
+    def __init__(self, input_labels=None, output_labels=None, state_topic=None, srv_topic=None,
+                 debug=False, evaluation=False):
         """The constructor"""
         # parent class that provides sklearn related interfaces.
         learning_base.__init__(self)
 
-        self.key_to_label = {}
-        for i, l in enumerate(input_labels):
-            self.key_to_label[l] = i
-        self.output_labels = output_labels
+        if input_labels is not None and output_labels is not None:
+            self.key_to_label = {}
+            for i, l in enumerate(input_labels):
+                self.key_to_label[l] = i
+            self.output_labels = output_labels
+        else:
+            self.key_to_label = {'full': 0, 'empty':1}
         
         self._state_topic  = state_topic
         self._srv_topic    = srv_topic
@@ -82,20 +86,20 @@ class obj_state_classifier(learning_base):
         self._filt       = collections.deque(maxlen=filt_len)
         
         self._initParams()        
-        self._initComms()
+        if evaluation is False: self._initComms()
         
 
     def _initParams(self):
         """Load parameters from ROS server"""       
         # HMM parameters
-        self.nState       = 30
+        self.nState       = 20
         self.nEmissionDim = 2
-        self.cov          = 1.0
-        self.scale        = [1.,1.]
+        self.cov          = 2. #0.5
+        self.scale        = [10,1] #[0.5,1.]
         self.cov_type     = 'full'
         self.cov_mult     = [self.cov]*(self.nEmissionDim**2)
 
-        self._likelihood_ratio_ths = 300 #2.11 #0.75
+        self._likelihood_ratio_ths = 0 #2.11 #0.75
 
 
     def _initComms(self):
@@ -107,7 +111,7 @@ class obj_state_classifier(learning_base):
     def _state_callback(self, msg):
         '''Subscribe state'''        
         with self._event_lock:
-            self._filt.append( [msg.pose.position.z, msg.wrench.force.z] )
+            self._filt.append( [msg.pose.position.x, msg.wrench.force.x] )
 
             if len(self._filt)<filt_len: return
 
@@ -121,12 +125,15 @@ class obj_state_classifier(learning_base):
             x = np.array(deepcopy(self._window))
 
             if len(x)<5: return None_StringResponse("NA")
-
+            
             # offset
-            x[:,0] -= np.mean(x[:10,0])
+            #x[:,0] -= np.mean(x[:10,0])
+            x -= np.mean(x[:10], axis=0)
             for i, v in enumerate(x):
-                if v[0] > z_thres:
+                #if v[0] > z_thres:
+                if abs(v[1]) > force_thres:
                     break
+            #i=len(x)-1
 
             idx = i-time_offset if i-time_offset >=0 else 0
             if len(x)<idx+data_length:
@@ -135,13 +142,14 @@ class obj_state_classifier(learning_base):
                     x.append(x[-1])
             
             x = np.array(x)[idx:idx+data_length]
-
+            x -= np.mean(x[:10], axis=0)
+                        
             # pre-processing
             ## x = (x-np.amin(x,axis=0))/(np.amax(x,axis=0)-np.amin(x,axis=0))
             ## x -= np.mean(x[:10], axis=0)
 
             ###############################################3
-            if self._debug_mode: self.debug_plot(x)
+            if self._debug_mode is True: self.debug_plot(x)
             ###############################################3
             
             x = np.expand_dims(x, axis=0)
@@ -164,7 +172,7 @@ class obj_state_classifier(learning_base):
         for key in self.key_to_label.keys():
             trainData.append([])
             self._mls.append(None)
-            
+                
         for i, label in enumerate(y):
             trainData[label].append(X[i])
 
@@ -175,7 +183,7 @@ class obj_state_classifier(learning_base):
             data = np.swapaxes(data,1,2)#*self.scale
             for j in xrange(len(data)):
                 data[j] *= self.scale[j]
-            
+
             ret = ml.fit(data, cov_mult=self.cov_mult, \
                          use_pkl=False, cov_type=self.cov_type)
             if ret == 'Failure' or np.isnan(ret):
@@ -205,14 +213,14 @@ class obj_state_classifier(learning_base):
 
             # TODO for multi classes
             # Likelihood ratio based binary classification
-            if l[1]-l[0] < self._likelihood_ratio_ths:
-                print "Label 0, Log-likelihood Ratio: {}, Threshold: {}".format(l[1]-l[0],
-                                                                                self._likelihood_ratio_ths)
-                y_pred.append( 0 )
-            else:
+            if l[1]-l[0] > self._likelihood_ratio_ths:
                 print "Label 1, Log-likelihood Ratio: {}, Threshold: {}".format(l[1]-l[0],
                                                                                 self._likelihood_ratio_ths)
                 y_pred.append( 1 )
+            else:
+                print "Label 0, Log-likelihood Ratio: {}, Threshold: {}".format(l[1]-l[0],
+                                                                                self._likelihood_ratio_ths)
+                y_pred.append( 0 )
 
         return y_pred
 
@@ -248,28 +256,24 @@ class obj_state_classifier(learning_base):
         rospack   = rospkg.RosPack()
         data_path = os.path.join(rospack.get_path('object_estimator'),'data')
         d = ut.load_pickle(os.path.join(data_path, "empty_full_data.pkl"))
-
+                
         import matplotlib.pyplot as plt
         fig = plt.figure(1)
         ax = fig.add_subplot(2, 1, 1)
         plt.plot(x[:,0], 'k*-', markersize=12)
-        plt.plot(d['heavy'][:,:,0].T, 'r-', markersize=12)
-        plt.plot(d['light'][:,:,0].T, 'b-', markersize=12)
+        plt.plot(d[self.output_labels[0]][:,:,0].T, 'r-', markersize=12)
+        plt.plot(d[self.output_labels[1]][:,:,0].T, 'b-', markersize=12)
 
         ax = fig.add_subplot(2, 1, 2)
         plt.plot(x[:,1], 'k*-', markersize=12)
-        plt.plot(d['heavy'][:,:,1].T, 'r-', markersize=12)
-        plt.plot(d['light'][:,:,1].T, 'b-', markersize=12)
+        plt.plot(d[self.output_labels[0]][:,:,1].T, 'r-', markersize=12)
+        plt.plot(d[self.output_labels[1]][:,:,1].T, 'b-', markersize=12)
+        #from IPython import embed; embed(); sys.exit()
 
         plt.ion()
         plt.show()
         ## plt.savefig("test.pdf")
         #sys.exit()
-
-
-
-
-
 
 
 def cross_eval(data_dict, labels, cv=5):
@@ -291,11 +295,16 @@ def cross_eval(data_dict, labels, cv=5):
     data   = np.array(data)[rnd_idx].tolist()
     target = np.array(target)[rnd_idx].tolist()
 
-    clf = obj_state_classifier()
+    clf = obj_state_classifier(evaluation=True)
     #clf.fit(data, target)
     scores = cross_val_score(clf, data, target, cv=cv)
-    
+
+    print "-----------------------------------------------------"
     print "Avg. score: ", np.mean(scores), np.std(scores)
+    print "-----------------------------------------------------"
+
+
+    
 
 
 if __name__ == '__main__':
@@ -319,6 +328,8 @@ if __name__ == '__main__':
     
     p.add_option('--plot', action='store', dest='plot', type='string',
                  default='false', help='Plot raw data')
+    p.add_option('--cv', action='store', dest='cv', type='string',
+                 default='false', help='cross evaluation')
     p.add_option('--debug', action='store', dest='debug', type='string',
                  default='false', help='Debug mode')
     opt, args = p.parse_args()
@@ -334,22 +345,27 @@ if __name__ == '__main__':
 
     # Output labels
     if opt.out_labels is None:
-        output_labels = in_labels
+        output_labels = opt.in_labels
     else:
         output_labels = []
         for l in opt.out_labels.split('_'):
             output_labels.append(l)
 
+    if opt.debug == 'true': opt.debug = True
+    else: opt.debug = False
+            
     # Data
     if opt.preprocessing.find('true')>=0:
         d = extract_data(data_path, input_labels, opt.state_topic)
         ut.save_pickle(d, os.path.join(data_path, opt.saved_filename))
     else:
         d = ut.load_pickle(os.path.join(data_path, opt.saved_filename))
+        assert d is not None, "Data dict is empty. Did you copy or collected data?"
 
-    if opt.plot.find('true')>=0 or opt.debug.find('true')>=0:
-        plot_raw_data(d)
-        ## cross_eval(d)
+    if opt.plot.find('true')>=0:# or opt.debug.find('true')>=0:
+        plot_raw_data(d, input_labels)
+    elif opt.cv.find('true')>=0:
+        cross_eval(d, input_labels)    
     else:
         rospy.init_node('obj_state_classifier_node')
         wse = obj_state_classifier(input_labels, output_labels, opt.state_topic, opt.srv_topic,

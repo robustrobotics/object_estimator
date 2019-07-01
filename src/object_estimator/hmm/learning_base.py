@@ -36,8 +36,8 @@ import warnings
 ## from manipulator_controller import util as ut
 
 ## import scipy
-from sklearn.cross_validation import train_test_split
-from sklearn.grid_search import GridSearchCV
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import classification_report
 from sklearn.externals import six
 

@@ -1,0 +1,50 @@
+<launch>
+  <arg name="name" default="husky8" />
+
+  <!-- End-effector wrench topic with msg type: EndpointState -->
+  <arg name="state_topic" default="$(arg name)/EndpointState"/>
+
+  <!-- Estimation service name with type: None_String -->
+  <arg name="srv_topic" default="$(arg name)/object_state"/>
+
+  <!-- Raw data path in object_estimator pkg.-->
+  <arg name="data_path" default="data"/>
+
+  <!-- Preprocessed file name-->
+  <arg name="filename" default="empty_full_data.pkl"/>
+
+  <!-- input/output labels-->
+  <arg name="input_labels" default="empty_full"/>
+  <arg name="output_labels" default="full_empty"/>
+
+  <!-- Enable preprocessing-->
+  <arg name="en_preprocess" default="false"/>
+
+  <!-- Plot raw data -->
+  <arg name="plot" default="false"/>
+
+  <!-- Cross Evaluation -->
+  <arg name="cv" default="false"/>
+  
+  <!-- Enable Debug mode-->
+  <arg name="debug_mode" default="false"/>
+  
+
+  <!-- Start the object state estimator server -->
+  <node name="full_cup_est"
+        pkg="object_estimator"
+        type="obj_state_classifier.py" 
+        args="--state_topic $(arg state_topic) 
+              --srv_topic $(arg srv_topic)
+              --dp $(arg data_path)
+              --saved_filename $(arg filename)
+              --preprocessing $(arg en_preprocess)
+              --input_labels $(arg input_labels)
+              --output_labels $(arg output_labels)
+              --plot $(arg plot)
+              --cv $(arg cv)
+              --debug $(arg debug_mode)"
+        required="true"
+        output="screen" />
+
+</launch>

@@ -30,15 +30,16 @@ import rosbag
 import matplotlib.lines as mlines
 
 min_length   = 700 
-data_length  = 150 #300
-force_thres  = 0.2
-filt_len     = 10
-time_offset = 50
+data_length  = 50 #150 #200 #300
+filt_len     = 3 #10
+time_offset = 25
 z_thres = 0.05
+force_thres  = 5
 
 def extract_data(data_path, labels, state_topic):
     """Extract and preprocess data
-    z_thres:     a lifting-time decision threshold [m]
+    z_thres:     a movement-time decision threshold [m]
+    force_thres: a contact-time decision threshold [N]
     data_length: a length of data sequence (50~200 will be a good number)
     """
     key_to_label = {}
@@ -56,7 +57,6 @@ def extract_data(data_path, labels, state_topic):
 
     # get all bags
     folder_list  = [d for d in os.listdir(data_path) if os.path.isdir(os.path.join(data_path,d))]
-    file_list = []
     for d in folder_list:
         for key in key_to_label:
             if d.find(key)>=0:        
@@ -78,7 +78,7 @@ def extract_data(data_path, labels, state_topic):
             samples = []
             times   = []
             for topic, msg, t in bag.read_messages(topics=[state_topic]):
-                filt.append([msg.pose.position.z, msg.wrench.force.z])
+                filt.append([msg.pose.position.x, msg.wrench.force.x])
                 if len(filt)<max_len: continue
 
                 samples.append(np.sum(filt, axis=0)/float(max_len))
@@ -94,11 +94,15 @@ def extract_data(data_path, labels, state_topic):
         for i in xrange(len(data_dict[key])):
             # Remove white noise (offset)
             samples = np.array(data_dict[key][i])
-            samples[:,0] = np.array(samples[:,0]) - np.mean(samples[:10,0])
+            #samples[:,0] = np.array(samples[:,0]) - np.mean(samples[:10,0])
+            #samples[:,1] = np.array(samples[:,1]) - np.mean(samples[:10,1])
+            samples = np.array(samples) - np.mean(samples[:10], axis=0)
 
             # Find a lifting timestep that z-height is over a certain threshold(z_thres)
-            for j in xrange(len(samples)):
-                if samples[j][0]>z_thres: break
+            # Find contact_force over a certain threshold
+            for j in xrange(len(samples)-3):
+                #if samples[j][0]>z_thres: break
+                if abs(np.mean(samples[j:j+3][1]))>force_thres: break
 
             # Set start index
             data_dict[key][i] = samples
@@ -117,6 +121,7 @@ def extract_data(data_path, labels, state_topic):
             time_dict[key][i] = time_dict[key][i][idx:idx+data_length]
 
             samples = data_dict[key][i]
+            samples = np.array(samples) - np.mean(samples[:10], axis=0)
             data_dict[key][i] = samples
 
             # Remove data that still has a short length
@@ -130,7 +135,7 @@ def extract_data(data_path, labels, state_topic):
     return data_dict
 
 
-def plot_raw_data(data_dict):
+def plot_raw_data(data_dict, labels):
     '''Plot raw data'''
     
     import matplotlib.pyplot as plt
@@ -138,15 +143,15 @@ def plot_raw_data(data_dict):
     fig = plt.figure(figsize=(12, 6))
     #fig = plt.figure(1)
 
-    dim = len(data_dict['heavy'][0,0])
+    dim = len(data_dict[labels[0]][0,0])
     for i in xrange(dim):
 
         ax = fig.add_subplot(1, dim, i+1)
 
-        mu_light  = np.mean(data_dict['light'][:,:,i],axis=0)
-        std_light = np.std(data_dict['light'][:,:,i],axis=0)
-        mu_heavy = np.mean(data_dict['heavy'][:,:,i],axis=0)
-        std_heavy = np.std(data_dict['heavy'][:,:,i],axis=0)
+        mu_light  = np.mean(data_dict[labels[0]][:,:,i],axis=0)
+        std_light = np.std(data_dict[labels[0]][:,:,i],axis=0)
+        mu_heavy = np.mean(data_dict[labels[1]][:,:,i],axis=0)
+        std_heavy = np.std(data_dict[labels[1]][:,:,i],axis=0)
         
         plt.plot(mu_light, 'b-', label='Empty')
         plt.plot(mu_heavy, 'r-', label='Full')
@@ -161,7 +166,7 @@ def plot_raw_data(data_dict):
                         facecolor='red', alpha=0.5, linewidth=0)
 
         if i==0:
-            ax.set_ylabel("Lifting distance [m]", fontsize=18)
+            ax.set_ylabel("Approach distance [m]", fontsize=18)
             #ax.xaxis.set_major_locator(plt.NullLocator())
         else:
             ax.set_ylabel("Z-axis force [N]", fontsize=18)
@@ -169,13 +174,19 @@ def plot_raw_data(data_dict):
         ax.set_xlim([0, len(mu_light)])
         ax.set_xlabel("Time [s]", fontsize=18)
         
-        plt.xticks([0, len(mu_light)/2, len(mu_light)], [0, 0.675, 1.35])
+        #plt.xticks([0, len(mu_light)/2, len(mu_light)], [0, 0.675, 1.35])
 
     blue_line = mlines.Line2D([], [], color='blue', alpha=0.5, markersize=30, label='Empty', lw=10)
     green_line = mlines.Line2D([], [], color='red', markersize=15, label='Full', lw=10)
     handles = [blue_line,green_line]
     labels = [h.get_label() for h in handles]
-    fig.legend(handles=handles, labels=labels, loc='upper right', ncol=2, shadow=True, fancybox=True,
+    fig.legend(handles=handles, labels=labels, loc='best',
+               bbox_to_anchor=(-0.02, -0.25, 0.5, 0.5),
+               ncol=2, shadow=True, fancybox=True,
+               prop={'size': 16})
+    fig.legend(handles=handles, labels=labels, loc='best',
+               bbox_to_anchor=(0.4, -0.25, 0.5, 0.5),
+               ncol=2, shadow=True, fancybox=True,
                prop={'size': 16})
     
     plt.tight_layout()
