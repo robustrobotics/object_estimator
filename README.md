@@ -70,6 +70,9 @@ Same as the above
 ### Arguments for the main launch file
 Under construction
 
+### "ImportError: libghmm.so.1: cannot open shared object file: No such file or directory"
+Add the location of the installed shared object file to your LD_LIBRARY_PATH
+
 ### Convergence error
 If you recieves following message after launching the estimator, it means the current HMM failed to fit to the observed data. You have to tune the HMM's parameter as the above. 
 ~~~~bash
