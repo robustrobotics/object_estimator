@@ -247,6 +247,11 @@ if __name__ == '__main__':
                  help='evaluate all dataset')
     p.add_option('--evaluate_one', action='store_true', dest='eval_one',
                  help='evaluate all dataset')
+
+    p.add_option('--object_name', action='store', dest='obj_name', type='string',
+                 default='cabinet', help='Input an object name')
+    p.add_option('--file_id', action='store', dest='file_id', type=int,
+                 default=20, help='Input an id number out of 30')
     
     opt, args = p.parse_args()
 
@@ -268,6 +273,6 @@ if __name__ == '__main__':
     if opt.eval_all:
         ev.eval_all()
     elif opt.eval_one:
-        ev.eval_one("cabinet", 20)
+        ev.eval_one(opt.obj_name, opt.file_id)
 
 
