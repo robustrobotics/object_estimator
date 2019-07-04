@@ -73,7 +73,7 @@ class obj_state_classifier(learning_base):
                 self.key_to_label[l] = i
             self.output_labels = output_labels
         else:
-            self.key_to_label = {'full': 0, 'empty':1}
+            self.key_to_label = {'empty': 0, 'full':1}
         
         self._state_topic  = state_topic
         self._srv_topic    = srv_topic
@@ -193,9 +193,10 @@ class obj_state_classifier(learning_base):
             self._mls[self.key_to_label[key]] = ml 
 
                    
-    def predict(self, X):
+    def predict(self, X, debug=False, verbose=True):
 
         y_pred = []
+        l_ratio = []
         for i, x in enumerate(X):
             if len(np.shape(x)) == 2:
                 x = np.expand_dims(x, axis=0)
@@ -213,16 +214,22 @@ class obj_state_classifier(learning_base):
 
             # TODO for multi classes
             # Likelihood ratio based binary classification
-            if l[1]-l[0] > self._likelihood_ratio_ths:
-                print "Label 1, Log-likelihood Ratio: {}, Threshold: {}".format(l[1]-l[0],
+            likelihood_ratio = l[1] - l[0]
+            if  likelihood_ratio < self._likelihood_ratio_ths:
+                if verbose: print "Label 0, Log-likelihood Ratio: {}, Threshold: {}".format(likelihood_ratio,
+                                                                                            self._likelihood_ratio_ths)
+                y_pred.append( 0 )
+            else:
+                if verbose: print "Label 1, Log-likelihood Ratio: {}, Threshold: {}".format(likelihood_ratio,
                                                                                 self._likelihood_ratio_ths)
                 y_pred.append( 1 )
-            else:
-                print "Label 0, Log-likelihood Ratio: {}, Threshold: {}".format(l[1]-l[0],
-                                                                                self._likelihood_ratio_ths)
-                y_pred.append( 0 )
 
-        return y_pred
+            l_ratio.append( likelihood_ratio )
+
+        if debug:
+            return y_pred, l_ratio
+        else:
+            return y_pred
 
 
     def score(self, X, y_true):

@@ -29,14 +29,44 @@ import collections
 import rosbag
 import matplotlib.lines as mlines
 
-min_length   = 700 
+
+min_length   = 700
+offset_length= 10 
 data_length  = 50 #150 #200 #300
 filt_len     = 3 #10
 time_offset = 25
 z_thres = 0.05
 force_thres  = 5
+vel_thres    = 0.03
 
-def extract_data(data_path, labels, state_topic):
+
+def extract_rosbag_data(data_path, labels, state_topic, force_thres=5):
+    """Extract and preprocess data from multi-object rosbags
+    """
+    global data_length
+    global time_offset
+    global offset_length
+    data_length = 25
+    time_offset = 12
+    offset_length = 2
+    
+    obj_dict = {}
+
+    folder_list  = [d for d in os.listdir(data_path) if os.path.isdir(os.path.join(data_path,d))]
+    for d in folder_list:
+
+        obj_name  = d.split('_')[0]
+        obj_label = d.split('_')[1]
+        data_dict = extract_data(data_path,
+                                 labels, state_topic,
+                                 folder_list=[d],
+                                 force_thres=force_thres)
+        obj_dict[obj_name] = data_dict
+    
+    return obj_dict
+
+
+def extract_data(data_path, labels, state_topic, folder_list=None, force_thres=5):
     """Extract and preprocess data
     z_thres:     a movement-time decision threshold [m]
     force_thres: a contact-time decision threshold [N]
@@ -56,7 +86,9 @@ def extract_data(data_path, labels, state_topic):
         time_dict[key] = []
 
     # get all bags
-    folder_list  = [d for d in os.listdir(data_path) if os.path.isdir(os.path.join(data_path,d))]
+    if folder_list is None:
+        folder_list  = [d for d in os.listdir(data_path) if os.path.isdir(os.path.join(data_path,d))]
+        
     for d in folder_list:
         for key in key_to_label:
             if d.find(key)>=0:        
@@ -82,7 +114,8 @@ def extract_data(data_path, labels, state_topic):
                 if len(filt)<max_len: continue
 
                 samples.append(np.sum(filt, axis=0)/float(max_len))
-                times.append(msg.header.stamp.secs)
+                temp = msg.header.stamp
+                times.append(temp.to_sec())
 
             # make the time start from 0
             data_dict[key].append(samples)
@@ -96,14 +129,24 @@ def extract_data(data_path, labels, state_topic):
             samples = np.array(data_dict[key][i])
             #samples[:,0] = np.array(samples[:,0]) - np.mean(samples[:10,0])
             #samples[:,1] = np.array(samples[:,1]) - np.mean(samples[:10,1])
-            samples = np.array(samples) - np.mean(samples[:10], axis=0)
+            samples = np.array(samples) - np.mean(samples[:offset_length], axis=0)
+            times   = np.array(time_dict[key][i])
+
+            
 
             # Find a lifting timestep that z-height is over a certain threshold(z_thres)
             # Find contact_force over a certain threshold
+            move_flag = False
             for j in xrange(len(samples)-3):
                 #if samples[j][0]>z_thres: break
-                if abs(np.mean(samples[j:j+3][1]))>force_thres: break
-
+                if abs(np.mean(samples[j:j+3][1]))>force_thres:
+                    break
+                ## if abs(samples[j+3][0]-samples[j][0])/(times[j+3]-times[j]) >vel_thres and move_flag is False:
+                ##     move_flag = True
+                ## if abs(samples[j+3][0]-samples[j][0])/(times[j+3]-times[j]) <vel_thres/3. and move_flag is True:
+                ##     break
+            
+                
             # Set start index
             data_dict[key][i] = samples
             idx = j-time_offset if j-time_offset >=0 else 0
@@ -121,7 +164,7 @@ def extract_data(data_path, labels, state_topic):
             time_dict[key][i] = time_dict[key][i][idx:idx+data_length]
 
             samples = data_dict[key][i]
-            samples = np.array(samples) - np.mean(samples[:10], axis=0)
+            samples = np.array(samples) - np.mean(samples[:offset_length], axis=0)
             data_dict[key][i] = samples
 
             # Remove data that still has a short length

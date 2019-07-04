@@ -15,7 +15,7 @@
 
   <!-- input/output labels-->
   <arg name="input_labels" default="empty_full"/>
-  <arg name="output_labels" default="full_empty"/>
+  <arg name="output_labels" default="empty_full"/>
 
   <!-- Enable preprocessing-->
   <arg name="en_preprocess" default="false"/>
