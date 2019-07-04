@@ -48,7 +48,7 @@ class evaluation():
 
         # Training Data
         data_path = os.path.join(rospack.get_path('object_estimator'), train_data_path)
-        train_filename = os.path.join(data_path, saved_filename)
+        train_filename = os.path.join(data_path, "train_"+saved_filename)
         if preprocessing.find('true')>=0 or os.path.isfile(train_filename) is False:
             train_dict = extract_data(data_path, input_labels, 'husky8/EndpointState')
             ut.save_pickle(train_dict, train_filename)
@@ -57,14 +57,14 @@ class evaluation():
             assert train_dict is not None, "Data dict is empty. Did you copy or collected data?"
 
         # Test Data
-        ## data_path = os.path.join(rospack.get_path('object_estimator'), test_data_path)
-        ## test_filename = os.path.join(data_path, saved_filename)
-        if preprocessing.find('true')>=0 :
+        data_path = os.path.join(rospack.get_path('object_estimator'), test_data_path)
+        test_filename = os.path.join(data_path, "test_"+saved_filename)
+        if preprocessing.find('true')>=0  or os.path.isfile(test_filename) is False :
             test_dict = extract_rosbag_data(test_data_path, input_labels, 'husky8/EndpointState',
                                             force_thres=5)
-            ut.save_pickle(test_dict, os.path.join(test_data_path, saved_filename))
+            ut.save_pickle(test_dict, os.path.join(test_data_path, test_filename))
         else:
-            test_dict = ut.load_pickle(os.path.join(test_data_path, saved_filename))
+            test_dict = ut.load_pickle(os.path.join(test_data_path, test_filename))
             assert test_dict is not None, "Data dict is empty. Did you copy or collected data?"
 
 
@@ -126,6 +126,7 @@ class evaluation():
                 if len(self.test_dict[key][label])>0:
                     print "name={}: label={}, #data={}".format(key, label, len(self.test_dict[key][label]))
                     break
+        print "-----------------------------------------------------"
         return 
 
     def eval_all(self):
@@ -152,19 +153,22 @@ class evaluation():
 
             y_true += target
             ## y_pred += self.clf.predict(data)
-            print "Target: " , target
+            ## print "Target: " , target
             temp1, temp2 = self.clf.predict(data, debug=True, verbose=False)
             y_pred += temp1
             #y_pred += list(np.array(temp1)*-1+1)
             l_ratio[self.key_to_label[label]] += temp2
 
-        print np.mean(l_ratio, axis=-1)
-        print np.std(l_ratio, axis=-1)
+        ## print np.mean(l_ratio, axis=-1)
+        ## print np.std(l_ratio, axis=-1)
 
         # viz confusion matrix
         ## metrics.confusion_matrix(y_true, y_pred, self.input_labels)
+        print "-----------------------------------------------------"
+        print "Confusion Matrix: "
         print metrics.confusion_matrix(y_true, y_pred, labels=[0,1])
         print "ACC: {}".format(metrics.accuracy_score(y_true, y_pred))
+        print "-----------------------------------------------------"
         return 
 
 
@@ -188,7 +192,10 @@ class evaluation():
             if self.key_to_label[pred_label] == y_pred[0]:
                 break
 
+        print "-----------------------------------------------------"
+        print "Classification result of {} {}".format(object_name, file_idx)
         print "sucess={}, true_label={}, pred_label={}".format(y_pred[0]==target[0], true_label, pred_label)
+        print "-----------------------------------------------------"
         return y_pred[0]==target[0], true_label, pred_label 
 
 
